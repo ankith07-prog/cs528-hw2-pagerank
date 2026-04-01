@@ -2,7 +2,7 @@
 set -e
 
 PROJECT_ID="hw-2-486907"
-ZONE="us-central1-a"
+ZONE="us-central1-c"
 REGION="us-central1"
 
 SQL_INSTANCE="hw5-sql"
@@ -36,18 +36,39 @@ gcloud compute instances delete "$HW6_VM" --zone="$ZONE" --quiet >/dev/null 2>&1
 echo "Creating HW6 VM..."
 gcloud compute instances create "$HW6_VM" \
   --zone="$ZONE" \
-  --machine-type=e2-standard-2 \
+  --machine-type=e2-micro \
   --image-family=debian-12 \
   --image-project=debian-cloud \
   --scopes=https://www.googleapis.com/auth/cloud-platform \
   --metadata=DB_HOST="$DB_HOST",DB_USER="$SQL_USER",DB_PASSWORD="$SQL_PASSWORD",DB_NAME="$SQL_DB",BUCKET_NAME="$BUCKET_NAME" \
   --metadata-from-file startup-script=hw6/startup.sh
 
-echo "Waiting for VM startup to finish..."
-sleep 120
+echo "Waiting for HW6 outputs to appear in the bucket..."
 
-echo "Listing HW6 outputs in bucket..."
-gcloud storage ls "gs://$BUCKET_NAME/hw6/" || true
+MAX_TRIES=40
+SLEEP_SECS=15
+FOUND=0
+
+for i in $(seq 1 $MAX_TRIES); do
+  echo "Check $i/$MAX_TRIES..."
+  if gcloud storage ls "gs://$BUCKET_NAME/hw6/" >/tmp/hw6_bucket_check.txt 2>/dev/null; then
+    if grep -q "hw6_summary.txt\|model1_ip_to_country_test_output.csv\|model2_income_test_output.csv" /tmp/hw6_bucket_check.txt; then
+      FOUND=1
+      break
+    fi
+  fi
+  sleep $SLEEP_SECS
+done
+
+if [ "$FOUND" -eq 1 ]; then
+  echo "HW6 outputs found in bucket:"
+  cat /tmp/hw6_bucket_check.txt
+else
+  echo "Timed out waiting for HW6 outputs in bucket."
+  echo
+  echo "You can inspect the VM with:"
+  echo "gcloud compute ssh $HW6_VM --zone=$ZONE --command=\"journalctl -u google-startup-scripts.service --no-pager | tail -120\""
+fi
 
 echo
 echo "===== hw6_summary.txt ====="
