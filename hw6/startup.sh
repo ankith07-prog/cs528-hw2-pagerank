@@ -2,7 +2,7 @@
 set -e
 
 apt-get update
-apt-get install -y python3-pip git default-mysql-client
+apt-get install -y python3-pip python3-venv git default-mysql-client
 
 cd /root
 
@@ -12,7 +12,10 @@ fi
 
 cd cs528-hw2-pagerank
 
-python3 -m pip install --upgrade pip
-python3 -m pip install -r hw6/requirements.txt
+python3 -m venv /root/hw6-venv
+source /root/hw6-venv/bin/activate
 
-python3 hw6/run_hw6.py | tee /root/hw6_run.log
+pip install --upgrade pip
+pip install -r hw6/requirements.txt
+
+python hw6/run_hw6.py | tee /root/hw6_run.log
