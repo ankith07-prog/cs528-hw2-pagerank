@@ -2,7 +2,7 @@
 set -e
 
 apt-get update
-apt-get install -y python3-pip git mysql-client
+apt-get install -y python3-pip git default-mysql-client
 
 cd /root
 
