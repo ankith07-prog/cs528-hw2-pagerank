@@ -123,14 +123,11 @@ def run_model1(df: pd.DataFrame):
 def run_model2(df: pd.DataFrame):
     data = df.copy()
 
-    # Clean string columns
     for col in ["country", "gender", "income", "time_of_day", "requested_file"]:
         data[col] = data[col].astype(str).str.strip()
 
-    # Normalize target values
     data["income"] = data["income"].str.title()
 
-    # Keep only expected labels
     valid_income = {"High", "Medium", "Low"}
     data = data[data["income"].isin(valid_income)].copy()
 
