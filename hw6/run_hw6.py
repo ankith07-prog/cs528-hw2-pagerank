@@ -123,6 +123,17 @@ def run_model1(df: pd.DataFrame):
 def run_model2(df: pd.DataFrame):
     data = df.copy()
 
+    # Clean string columns
+    for col in ["country", "gender", "income", "time_of_day", "requested_file"]:
+        data[col] = data[col].astype(str).str.strip()
+
+    # Normalize target values
+    data["income"] = data["income"].str.title()
+
+    # Keep only expected labels
+    valid_income = {"High", "Medium", "Low"}
+    data = data[data["income"].isin(valid_income)].copy()
+
     def age_bucket(val):
         if pd.isna(val):
             return "Unknown"
@@ -143,7 +154,6 @@ def run_model2(df: pd.DataFrame):
 
     data["age_bucket"] = data["age"].apply(age_bucket)
 
-    # Avoid using client_ip to reduce leakage and make the model more realistic.
     features = [
         "country",
         "is_banned",
@@ -154,7 +164,15 @@ def run_model2(df: pd.DataFrame):
     ]
     target = "income"
 
-    data = data[features + [target]].dropna()
+    data = data[features + [target]].dropna().copy()
+
+    print("\nModel 2 target distribution:")
+    print(data[target].value_counts())
+
+    if data[target].nunique() < 2:
+        raise ValueError(
+            f"Model 2 target has fewer than 2 classes after cleaning: {data[target].unique()}"
+        )
 
     X = data[features]
     y = data[target]
@@ -192,7 +210,12 @@ def run_model2(df: pd.DataFrame):
     pred_y = model.predict(test_X)
 
     acc = accuracy_score(test_y, pred_y)
-    report = classification_report(test_y, pred_y, zero_division=0)
+    report = classification_report(
+        test_y,
+        pred_y,
+        labels=["High", "Medium", "Low"],
+        zero_division=0
+    )
 
     out = test_X.copy()
     out["actual_income"] = test_y.values
