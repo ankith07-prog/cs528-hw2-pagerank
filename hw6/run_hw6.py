@@ -81,7 +81,6 @@ def load_model2_data(conn):
     JOIN countries c
       ON m.country_id = c.country_id
     WHERE r.income IS NOT NULL
-      AND r.income <> 'Unknown'
     """
     return pd.read_sql(query, conn)
 
@@ -123,13 +122,22 @@ def run_model1(df: pd.DataFrame):
 def run_model2(df: pd.DataFrame):
     data = df.copy()
 
+    print("\nDEBUG raw income unique:")
+    print(sorted([repr(v) for v in data["income"].drop_duplicates().tolist()]))
+
     data["country"] = data["country"].fillna("Unknown").astype(str).str.strip()
     data["gender"] = data["gender"].fillna("Unknown").astype(str).str.strip()
     data["income"] = data["income"].fillna("Unknown").astype(str).str.strip()
     data["time_of_day"] = data["time_of_day"].fillna("Unknown").astype(str).str.strip()
     data["requested_file"] = data["requested_file"].fillna("Unknown").astype(str).str.strip()
 
-    data = data[data["income"].isin(["High", "Medium", "Low"])].copy()
+    print("\nDEBUG cleaned income unique:")
+    print(sorted([repr(v) for v in data["income"].drop_duplicates().tolist()]))
+
+    data = data[data["income"] != "Unknown"].copy()
+
+    print("\nDEBUG after dropping Unknown:")
+    print(data["income"].value_counts(dropna=False))
 
     def age_bucket(val):
         if pd.isna(val):
@@ -162,13 +170,15 @@ def run_model2(df: pd.DataFrame):
     ]
 
     X = data[features].copy()
-    y = data["income"].copy()
+    y = data["income"].astype(str).str.strip().copy()
 
     print("\nModel 2 target distribution:")
-    print(y.value_counts())
+    print(y.value_counts(dropna=False))
 
+    if len(y) == 0:
+        raise ValueError("Model 2 target became empty.")
     if y.nunique() < 2:
-        raise ValueError(f"Model 2 target has fewer than 2 classes: {y.unique()}")
+        raise ValueError(f"Model 2 target has fewer than 2 classes: {list(y.unique())}")
 
     train_X, test_X, train_y, test_y = train_test_split(
         X,
@@ -201,12 +211,7 @@ def run_model2(df: pd.DataFrame):
     pred_y = model.predict(test_X)
 
     acc = accuracy_score(test_y, pred_y)
-    report = classification_report(
-        test_y,
-        pred_y,
-        labels=["High", "Medium", "Low"],
-        zero_division=0
-    )
+    report = classification_report(test_y, pred_y, zero_division=0)
 
     out = test_X.copy()
     out["actual_income"] = test_y.values
