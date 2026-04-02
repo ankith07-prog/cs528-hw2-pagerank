@@ -31,10 +31,10 @@ def get_conn():
         password=DB_PASSWORD,
         database=DB_NAME,
         autocommit=True,
-        cursorclass=pymysql.cursors.DictCursor,
         connect_timeout=30,
         read_timeout=60,
         write_timeout=60,
+        charset="utf8mb4",
     )
 
 
