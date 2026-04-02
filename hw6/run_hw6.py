@@ -9,15 +9,12 @@ from sklearn.metrics import accuracy_score, classification_report
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
-from google.cloud import storage
 
 
 DB_HOST = os.environ["DB_HOST"]
 DB_USER = os.environ["DB_USER"]
 DB_PASSWORD = os.environ["DB_PASSWORD"]
 DB_NAME = os.environ["DB_NAME"]
-BUCKET_NAME = os.environ["BUCKET_NAME"]
-GOOGLE_CLOUD_PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "hw-2-486907")
 
 ROOT = Path(__file__).resolve().parent
 SCHEMA_SQL = ROOT / "schema_3nf.sql"
@@ -85,14 +82,6 @@ def load_model2_data(conn):
     return pd.read_sql(query, conn)
 
 
-def upload_to_bucket(local_path: str, object_name: str):
-    client = storage.Client(project=GOOGLE_CLOUD_PROJECT)
-    bucket = client.bucket(BUCKET_NAME)
-    blob = bucket.blob(object_name)
-    blob.upload_from_filename(local_path)
-    print(f"Uploaded to gs://{BUCKET_NAME}/{object_name}")
-
-
 def run_model1(df: pd.DataFrame):
     train_df, test_df = train_test_split(
         df,
@@ -122,22 +111,13 @@ def run_model1(df: pd.DataFrame):
 def run_model2(df: pd.DataFrame):
     data = df.copy()
 
-    print("\nDEBUG raw income unique:")
-    print(sorted([repr(v) for v in data["income"].drop_duplicates().tolist()]))
-
     data["country"] = data["country"].fillna("Unknown").astype(str).str.strip()
     data["gender"] = data["gender"].fillna("Unknown").astype(str).str.strip()
     data["income"] = data["income"].fillna("Unknown").astype(str).str.strip()
     data["time_of_day"] = data["time_of_day"].fillna("Unknown").astype(str).str.strip()
     data["requested_file"] = data["requested_file"].fillna("Unknown").astype(str).str.strip()
 
-    print("\nDEBUG cleaned income unique:")
-    print(sorted([repr(v) for v in data["income"].drop_duplicates().tolist()]))
-
     data = data[data["income"] != "Unknown"].copy()
-
-    print("\nDEBUG after dropping Unknown:")
-    print(data["income"].value_counts(dropna=False))
 
     def age_bucket(val):
         if pd.isna(val):
@@ -266,15 +246,6 @@ def main():
             f.write("\n")
 
         print(f"Saved local outputs to {output_dir}")
-
-        try:
-            upload_to_bucket(m1_csv, "hw6/model1_ip_to_country_test_output.csv")
-            upload_to_bucket(m2_csv, "hw6/model2_income_test_output.csv")
-            upload_to_bucket(summary_txt, "hw6/hw6_summary.txt")
-        except Exception as e:
-            print(f"Bucket upload failed: {e}")
-            print(f"Local files are still available in {output_dir}")
-
         print("Done.")
     finally:
         conn.close()

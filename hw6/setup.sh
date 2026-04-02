@@ -23,12 +23,9 @@ echo "Getting Cloud SQL IP..."
 DB_HOST=$(gcloud sql instances describe "$SQL_INSTANCE" --format="value(ipAddresses[0].ipAddress)")
 echo "DB_HOST=$DB_HOST"
 
-echo "Authorizing current Cloud Shell IP for Cloud SQL..."
+echo "Getting current Cloud Shell IP..."
 MY_IP=$(curl -s ifconfig.me)
 echo "MY_IP=$MY_IP"
-gcloud sql instances patch "$SQL_INSTANCE" \
-  --authorized-networks="${MY_IP}/32" \
-  --quiet
 
 echo "Deleting old HW6 VM if it exists..."
 gcloud compute instances delete "$HW6_VM" --zone="$ZONE" --quiet >/dev/null 2>&1 || true
@@ -40,8 +37,18 @@ gcloud compute instances create "$HW6_VM" \
   --image-family=debian-12 \
   --image-project=debian-cloud \
   --scopes=https://www.googleapis.com/auth/cloud-platform \
-  --metadata=DB_HOST="$DB_HOST",DB_USER="$SQL_USER",DB_PASSWORD="$SQL_PASSWORD",DB_NAME="$SQL_DB",BUCKET_NAME="$BUCKET_NAME" \
+  --metadata=PROJECT_ID="$PROJECT_ID",DB_HOST="$DB_HOST",DB_USER="$SQL_USER",DB_PASSWORD="$SQL_PASSWORD",DB_NAME="$SQL_DB",BUCKET_NAME="$BUCKET_NAME" \
   --metadata-from-file startup-script=hw6/startup.sh
+
+VM_IP=$(gcloud compute instances describe "$HW6_VM" \
+  --zone="$ZONE" \
+  --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
+echo "VM_IP=$VM_IP"
+
+echo "Authorizing both Cloud Shell IP and VM IP for Cloud SQL..."
+gcloud sql instances patch "$SQL_INSTANCE" \
+  --authorized-networks="${MY_IP}/32,${VM_IP}/32" \
+  --quiet
 
 echo "Waiting for HW6 outputs to appear in the bucket..."
 
