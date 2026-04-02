@@ -1,5 +1,4 @@
 import os
-import tempfile
 from pathlib import Path
 
 import pandas as pd
@@ -18,6 +17,7 @@ DB_USER = os.environ["DB_USER"]
 DB_PASSWORD = os.environ["DB_PASSWORD"]
 DB_NAME = os.environ["DB_NAME"]
 BUCKET_NAME = os.environ["BUCKET_NAME"]
+GOOGLE_CLOUD_PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "hw-2-486907")
 
 ROOT = Path(__file__).resolve().parent
 SCHEMA_SQL = ROOT / "schema_3nf.sql"
@@ -32,6 +32,9 @@ def get_conn():
         database=DB_NAME,
         autocommit=True,
         cursorclass=pymysql.cursors.DictCursor,
+        connect_timeout=30,
+        read_timeout=60,
+        write_timeout=60,
     )
 
 
@@ -84,7 +87,7 @@ def load_model2_data(conn):
 
 
 def upload_to_bucket(local_path: str, object_name: str):
-    client = storage.Client()
+    client = storage.Client(project=GOOGLE_CLOUD_PROJECT)
     bucket = client.bucket(BUCKET_NAME)
     blob = bucket.blob(object_name)
     blob.upload_from_filename(local_path)
@@ -96,7 +99,7 @@ def run_model1(df: pd.DataFrame):
         df,
         test_size=0.2,
         random_state=42,
-        stratify=df["country"]
+        stratify=df["country"],
     )
 
     ip_to_country = dict(zip(train_df["client_ip"], train_df["country"]))
@@ -140,6 +143,7 @@ def run_model2(df: pd.DataFrame):
 
     data["age_bucket"] = data["age"].apply(age_bucket)
 
+    # Avoid using client_ip to reduce leakage and make the model more realistic.
     features = [
         "country",
         "is_banned",
@@ -160,7 +164,7 @@ def run_model2(df: pd.DataFrame):
         y,
         test_size=0.2,
         random_state=42,
-        stratify=y
+        stratify=y,
     )
 
     categorical_features = features
@@ -179,7 +183,7 @@ def run_model2(df: pd.DataFrame):
                 max_depth=12,
                 min_samples_leaf=3,
                 random_state=42,
-                n_jobs=-1
+                n_jobs=-1,
             ))
         ]
     )
@@ -223,26 +227,34 @@ def main():
         print(f"Model 2 accuracy: {acc2:.4f}")
         print(report2)
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            m1_csv = os.path.join(tmpdir, "model1_ip_to_country_test_output.csv")
-            m2_csv = os.path.join(tmpdir, "model2_income_test_output.csv")
-            summary_txt = os.path.join(tmpdir, "hw6_summary.txt")
+        output_dir = Path("/root/hw6_outputs")
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-            out1.to_csv(m1_csv, index=False)
-            out2.to_csv(m2_csv, index=False)
+        m1_csv = str(output_dir / "model1_ip_to_country_test_output.csv")
+        m2_csv = str(output_dir / "model2_income_test_output.csv")
+        summary_txt = str(output_dir / "hw6_summary.txt")
 
-            with open(summary_txt, "w", encoding="utf-8") as f:
-                f.write("HW6 MODEL SUMMARY\n")
-                f.write("=================\n")
-                f.write(f"Model 1 accuracy (client_ip -> country): {acc1:.4f}\n")
-                f.write(f"Model 2 accuracy (predict income): {acc2:.4f}\n\n")
-                f.write("Income model classification report:\n")
-                f.write(report2)
-                f.write("\n")
+        out1.to_csv(m1_csv, index=False)
+        out2.to_csv(m2_csv, index=False)
 
+        with open(summary_txt, "w", encoding="utf-8") as f:
+            f.write("HW6 MODEL SUMMARY\n")
+            f.write("=================\n")
+            f.write(f"Model 1 accuracy (client_ip -> country): {acc1:.4f}\n")
+            f.write(f"Model 2 accuracy (predict income): {acc2:.4f}\n\n")
+            f.write("Income model classification report:\n")
+            f.write(report2)
+            f.write("\n")
+
+        print(f"Saved local outputs to {output_dir}")
+
+        try:
             upload_to_bucket(m1_csv, "hw6/model1_ip_to_country_test_output.csv")
             upload_to_bucket(m2_csv, "hw6/model2_income_test_output.csv")
             upload_to_bucket(summary_txt, "hw6/hw6_summary.txt")
+        except Exception as e:
+            print(f"Bucket upload failed: {e}")
+            print(f"Local files are still available in {output_dir}")
 
         print("Done.")
     finally:
