@@ -123,13 +123,13 @@ def run_model1(df: pd.DataFrame):
 def run_model2(df: pd.DataFrame):
     data = df.copy()
 
-    for col in ["country", "gender", "income", "time_of_day", "requested_file"]:
-        data[col] = data[col].astype(str).str.strip()
+    data["country"] = data["country"].fillna("Unknown").astype(str).str.strip()
+    data["gender"] = data["gender"].fillna("Unknown").astype(str).str.strip()
+    data["income"] = data["income"].fillna("Unknown").astype(str).str.strip()
+    data["time_of_day"] = data["time_of_day"].fillna("Unknown").astype(str).str.strip()
+    data["requested_file"] = data["requested_file"].fillna("Unknown").astype(str).str.strip()
 
-    data["income"] = data["income"].str.title()
-
-    valid_income = {"High", "Medium", "Low"}
-    data = data[data["income"].isin(valid_income)].copy()
+    data = data[data["income"].isin(["High", "Medium", "Low"])].copy()
 
     def age_bucket(val):
         if pd.isna(val):
@@ -141,13 +141,14 @@ def run_model2(df: pd.DataFrame):
 
         if val < 18:
             return "<18"
-        if val <= 25:
+        elif val <= 25:
             return "18-25"
-        if val <= 40:
+        elif val <= 40:
             return "26-40"
-        if val <= 60:
+        elif val <= 60:
             return "41-60"
-        return "60+"
+        else:
+            return "60+"
 
     data["age_bucket"] = data["age"].apply(age_bucket)
 
@@ -159,20 +160,15 @@ def run_model2(df: pd.DataFrame):
         "time_of_day",
         "requested_file",
     ]
-    target = "income"
 
-    data = data[features + [target]].dropna().copy()
+    X = data[features].copy()
+    y = data["income"].copy()
 
     print("\nModel 2 target distribution:")
-    print(data[target].value_counts())
+    print(y.value_counts())
 
-    if data[target].nunique() < 2:
-        raise ValueError(
-            f"Model 2 target has fewer than 2 classes after cleaning: {data[target].unique()}"
-        )
-
-    X = data[features]
-    y = data[target]
+    if y.nunique() < 2:
+        raise ValueError(f"Model 2 target has fewer than 2 classes: {y.unique()}")
 
     train_X, test_X, train_y, test_y = train_test_split(
         X,
@@ -182,11 +178,9 @@ def run_model2(df: pd.DataFrame):
         stratify=y,
     )
 
-    categorical_features = features
-
     preprocessor = ColumnTransformer(
         transformers=[
-            ("cat", OneHotEncoder(handle_unknown="ignore"), categorical_features)
+            ("cat", OneHotEncoder(handle_unknown="ignore"), features)
         ]
     )
 
