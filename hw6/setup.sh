@@ -3,7 +3,6 @@ set -e
 
 PROJECT_ID="hw-2-486907"
 ZONE="us-central1-c"
-REGION="us-central1"
 
 SQL_INSTANCE="hw5-sql"
 SQL_DB="hw5db"
@@ -11,13 +10,25 @@ SQL_USER="hw5user"
 SQL_PASSWORD="hw5pass123"
 
 BUCKET_NAME="hw-2-486907-ankith07-pagerank-001"
-
 HW6_VM="hw6-model-vm"
 
 gcloud config set project "$PROJECT_ID"
 
 echo "Ensuring required services are enabled..."
 gcloud services enable compute.googleapis.com sqladmin.googleapis.com storage.googleapis.com
+
+echo "Starting / enabling Cloud SQL instance..."
+gcloud sql instances patch "$SQL_INSTANCE" --activation-policy=ALWAYS --quiet
+
+echo "Waiting for Cloud SQL instance to become RUNNABLE..."
+while true; do
+  SQL_STATUS=$(gcloud sql instances describe "$SQL_INSTANCE" --format="value(state)")
+  echo "Cloud SQL state: $SQL_STATUS"
+  if [ "$SQL_STATUS" = "RUNNABLE" ]; then
+    break
+  fi
+  sleep 10
+done
 
 echo "Getting Cloud SQL IP..."
 DB_HOST=$(gcloud sql instances describe "$SQL_INSTANCE" --format="value(ipAddresses[0].ipAddress)")
@@ -90,5 +101,12 @@ echo "===== model2_income_test_output.csv (first 10 lines) ====="
 gcloud storage cp "gs://$BUCKET_NAME/hw6/model2_income_test_output.csv" - 2>/dev/null | head -10 || true
 
 echo
+echo "Deleting HW6 VM..."
+gcloud compute instances delete "$HW6_VM" --zone="$ZONE" --quiet || true
+
+echo "Stopping Cloud SQL instance..."
+gcloud sql instances patch "$SQL_INSTANCE" --activation-policy=NEVER --quiet
+
+echo
 echo "HW6 setup complete."
-echo "When finished, run: bash hw6/cleanup.sh"
+echo "Database stopped and VM deleted."
