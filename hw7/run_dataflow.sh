@@ -4,13 +4,8 @@ set -e
 PROJECT_ID="hw-2-486907"
 BUCKET="hw-2-486907-ankith07-pagerank-001"
 
-# Keep the Dataflow job managed in us-central1
-REGION="us-central1"
-
-# Let workers run in a different region so Dataflow can pick an available zone there
-WORKER_REGION="us-east1"
-
-# Keep resource ask small
+# Move the whole job to a different region
+REGION="us-east1"
 MACHINE_TYPE="e2-standard-2"
 
 INPUT="gs://${BUCKET}/pages/*.txt"
@@ -35,7 +30,6 @@ time python3 hw7/src/hw7_pipeline.py \
   --runner DataflowRunner \
   --project "${PROJECT_ID}" \
   --region "${REGION}" \
-  --worker_region "${WORKER_REGION}" \
   --machine_type "${MACHINE_TYPE}" \
   --num_workers 1 \
   --max_num_workers 1 \
@@ -46,6 +40,7 @@ time python3 hw7/src/hw7_pipeline.py \
 echo
 echo "Dataflow job submitted."
 echo "Job name: ${JOB_NAME}"
+echo "Region: ${REGION}"
 echo "Output path: ${OUTPUT}"
 echo
 echo "Check results after completion with:"
