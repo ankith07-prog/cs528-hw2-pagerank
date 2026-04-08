@@ -4,9 +4,9 @@ set -e
 PROJECT_ID="hw-2-486907"
 BUCKET="hw-2-486907-ankith07-pagerank-001"
 
-# Move the whole job to a different region
 REGION="us-east1"
-MACHINE_TYPE="e2-standard-2"
+WORKER_ZONE="us-east1-b"
+MACHINE_TYPE="e2-medium"
 
 INPUT="gs://${BUCKET}/pages/*.txt"
 OUTPUT="gs://${BUCKET}/hw7-output"
@@ -30,6 +30,7 @@ time python3 hw7/src/hw7_pipeline.py \
   --runner DataflowRunner \
   --project "${PROJECT_ID}" \
   --region "${REGION}" \
+  --worker_zone "${WORKER_ZONE}" \
   --machine_type "${MACHINE_TYPE}" \
   --num_workers 1 \
   --max_num_workers 1 \
@@ -41,9 +42,5 @@ echo
 echo "Dataflow job submitted."
 echo "Job name: ${JOB_NAME}"
 echo "Region: ${REGION}"
+echo "Worker zone: ${WORKER_ZONE}"
 echo "Output path: ${OUTPUT}"
-echo
-echo "Check results after completion with:"
-echo "gsutil cat ${OUTPUT}/outgoing_top5/result"
-echo "gsutil cat ${OUTPUT}/incoming_top5/result"
-echo "gsutil cat ${OUTPUT}/bigrams_top5/result"
